@@ -1,5 +1,20 @@
 #!/usr/bin/python3
 import socket
+import hashlib
+import base64
+import datetime
+import os
+import sys
+
+def val_proof_of_work(message):
+    hash_bytes = hashlib.sha256(message.encode('utf-8')).digest()
+    val = int.from_bytes(hash_bytes[:3], byteorder='big')
+    return val < 4
+
+def generate_hash(message):
+    hash_bytes = hashlib.sha256(message.encode('utf-8')).digest()
+    base64_hash = base64.b64encode(hash_bytes).decode('utf-8')
+    return base64_hash[-24:]
 
 def handle_client(client_socket):
     try:
@@ -20,10 +35,74 @@ def handle_client(client_socket):
             ### Update loghead.txt
             ### Add error checking
             #######################################
+            if not val_proof_of_work(message):
+                response = "error: invalid proof of work\n"
+                client_out.write(response)
+                client_out.flush()
+                return
 
-            # Append the received string to log.txt
-            with open("log.txt", "a") as log_file:
-                log_file.write(message + "\n")
+            if ':' not in message:
+                response = "error: missing proof of work separator\n"
+                client_out.write(response)
+                client_out.flush()
+                return
+            
+            #strip proof of work
+            _, user_message = message.split(':', 1)
+
+            #replace : with >
+            processed_message = '>' + user_message
+
+            #timestamp
+            timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+            #check log file
+            log_exists = os.path.exists('log.txt')
+            head_exists = os.path.exists('loghead.txt')
+
+            #handle missing files
+            if not log_exists:
+                # Create new log file and ignore loghead.txt
+                previous_hash = "start"
+                
+                # Create log entry
+                log_entry = f"{timestamp} - {previous_hash} {processed_message}"
+                
+                # Append to log file
+                with open('log.txt', 'w') as log_file:
+                    log_file.write(log_entry + '\n')
+                
+                # Compute and store the head hash
+                head_hash = generate_hash(log_entry)
+                with open('loghead.txt', 'w') as head_file:
+                    head_file.write(head_hash)
+                    
+                response = "ok\n"
+            elif not head_exists:
+                # Log file exists but head file is missing
+                response = "error: head pointer file is missing\n"
+            else:
+                # Both files exist
+                try:
+                    # Read the previous hash from loghead.txt
+                    with open('loghead.txt', 'r') as head_file:
+                        previous_hash = head_file.read().strip()
+                    
+                    # Create log entry
+                    log_entry = f"{timestamp} - {previous_hash} {processed_message}"
+                    
+                    # Append to log file
+                    with open('log.txt', 'a') as log_file:
+                        log_file.write(log_entry + '\n')
+                    
+                    # Compute and store the new head hash
+                    head_hash = generate_hash(log_entry)
+                    with open('loghead.txt', 'w') as head_file:
+                        head_file.write(head_hash)
+                        
+                    response = "ok\n"
+                except Exception as e:
+                    response = f"error: {str(e)}\n"
 
             # Send a response message back to the client (terminated by a newline)
             response = "ok\n"

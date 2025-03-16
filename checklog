@@ -1,0 +1,83 @@
+#!/usr/bin/python3
+import hashlib
+import base64
+import os
+import sys
+
+def generate_hash(message):
+    hash_bytes = hashlib.sha256(message.encode('utf-8')).digest()
+    base64_hash = base64.b64encode(hash_bytes).decode('utf-8')
+    return base64_hash[-24:]
+
+def validate_log():
+    if len(sys.argv) > 1:
+        print("Failed: no arguments expected")
+        return False
+    
+    if not os.path.exists('log.txt'):
+        print("Failed: log file is missing")
+        return False
+    
+    if not os.path.exists('loghead.txt'):
+        print("Failed: head pointer file is missing")
+        return False
+    
+    try:
+        with open('log.txt', 'r') as log_file:
+            lines = log_file.readlines()
+        with open('loghead.txt', 'r') as head_file:
+            head_hash = head_file.read().strip()
+        
+        if not lines:
+            print("Failed: log file is empty")
+            return False
+        
+        first_line = lines[0].strip()
+        parts = first_line.split(' - ', 1)
+        if len(parts) != 2:
+            print("Failed: invalid log format in line 1")
+            return False
+        
+        hash_and_msg = parts[1].split(' ', 1)
+        if hash_and_msg[0] != 'start':
+            print("Failed: first line does not start with 'start'")
+            return False
+        
+        for i in range(len(lines) - 1):
+            current = lines[i].strip()
+            current_hash = generate_hash(current)
+            next_line = lines[i+1].strip()
+            next_part = next_line.split(' - ', 1)
+
+            if len(next_part) != 2:
+                print(f"Failed : invalid log line format in line {i+2}")
+                return False
+
+            next_hash_and_msg = next_part[1].split(" - ", 1)
+            if len(next_hash_and_msg) < 1:
+                print(f"Failed: invalid log format in line {i+2}")
+                return False
+            
+            next_hash = next_hash_and_msg[0]
+            if current_hash != next_hash:
+                print(f"Failed: hash mismatch on line {i+1}")
+                return False
+            
+        last_line = lines[-1].strip()
+        last_hash = generate_hash(last_line)
+
+        if last_hash != head_hash:
+            print("Failed: head hash mismatch")
+            return False
+        
+        return True
+    except Exception as e:
+        print(f"Failed: {str(e)}")
+        return False
+    
+if __name__ == "__main__":
+    if validate_log():
+        print("Valid!")
+        sys.exit(0)
+    else:
+        sys.exit(1)

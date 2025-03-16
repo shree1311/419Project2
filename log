@@ -1,9 +1,39 @@
 #!/usr/bin/python3
 import socket
 import sys
+import hashlib
+import string
+import random
+import re
+
+def gen_proof_of_work (message):
+    chars = string.ascii_letters + string.digits
+    for length in range(1, 10):  # Try strings of length 1 to 10
+        for _ in range(100000):  # Try many combinations before increasing length
+            # Generate a random string
+            proof = ''.join(random.choice(chars) for _ in range(length))
+            
+            # Compute the hash
+            combined = f"{proof}:{message}"
+            hash_bytes = hashlib.sha256(combined.encode('utf-8')).digest()
+            
+            # Check if first 22 bits are zero
+            # Convert the first 3 bytes to an integer
+            val = int.from_bytes(hash_bytes[:3], byteorder='big')
+            
+            # Check if the first 22 bits are zero (the value should be less than 2^(24-22) = 2^2 = 4)
+            if val < 4:
+                return proof
+            
+    return gen_proof_of_work(message)
+            
 
 def send_string_to_server(port, message):
     try:
+        if len(message.encode('utf-8')) < 64:
+            print("Error: Message must be at least 64 bytes long")
+            return
+        
         # Connect to the server
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.connect(('localhost', port))
@@ -12,10 +42,13 @@ def send_string_to_server(port, message):
         ### Convert any whitespace to spaces
         ### Modify the messsage to include the proof-of-work (Pow+':'+message)
         ######################
+        message = re.sub(r'\s', ' ', message)
+        pow_string = gen_proof_of_work(message)
+        full_message = f"{pow_string}:{message}"
 
         with client_socket.makefile('r') as server_in, client_socket.makefile('w') as server_out:
             # Send the message to the server, terminated by a newline
-            server_out.write(message + "\n")
+            server_out.write(full_message + "\n")
             server_out.flush()
 
             # Receive and print the confirmation message from the server
