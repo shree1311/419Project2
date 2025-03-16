@@ -30,9 +30,9 @@ def gen_proof_of_work (message):
 
 def send_string_to_server(port, message):
     try:
-        if len(message.encode('utf-8')) < 64:
-            print("Error: Message must be at least 64 bytes long")
-            return
+        #if len(message.encode('utf-8')) < 64:
+         #   print("Error: Message must be at least 64 bytes long")
+          #  return
         
         # Connect to the server
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

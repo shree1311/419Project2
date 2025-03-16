@@ -1,1 +1,1 @@
-2025-03-16 17:26:10 - start >this is a test of a log entry maybe we should do somehting about this to see if it actually works. i dont know if it will to be honest
+2025-03-16 17:39:02 - >this is a test of a log entry
